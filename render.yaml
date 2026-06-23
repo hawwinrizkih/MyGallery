@@ -1,0 +1,16 @@
+# Render.com Blueprint — background worker (long-polling Telegram bot).
+# Catatan: background worker di Render bukan free tier (mulai ~$7/bln).
+services:
+  - type: worker
+    name: xauusd-signal-bot
+    runtime: python
+    plan: starter
+    buildCommand: pip install -r requirements.txt
+    startCommand: python telegram_signal_bot.py
+    envVars:
+      - key: TWELVEDATA_API_KEY
+        sync: false       # diisi manual di dashboard (rahasia)
+      - key: TELEGRAM_BOT_TOKEN
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false

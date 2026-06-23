@@ -1,0 +1,15 @@
+# Fly.io — worker tanpa HTTP (cocok untuk long-polling bot).
+# Fly punya alokasi gratis untuk 1 VM kecil shared-cpu-1x.
+app = "xauusd-signal-bot"
+primary_region = "sin"   # Singapore (terdekat dari Indonesia)
+
+[build]
+
+[processes]
+  app = "python telegram_signal_bot.py"
+
+# Tidak ada [http_service] — bot ini tidak melayani HTTP, hanya long-polling.
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"
