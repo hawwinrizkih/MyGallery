@@ -25,7 +25,7 @@ ATR_TP2 = 3.0          # jarak TP2 (x ATR)
 # Default M5+M15 = 7 credit Twelve Data (aman utk free tier 8/menit).
 # Tambah "1min" -> M1/M5/M15 = 10 credit (bisa kena rate limit free tier).
 MTF_TIMEFRAMES = [t.strip() for t in
-                  os.environ.get("MTF_TIMEFRAMES", "5min,15min").split(",") if t.strip()]
+                  os.environ.get("MTF_TIMEFRAMES", "1min,5min,15min").split(",") if t.strip()]
 
 
 def fetch_signal_data(api_key: str) -> dict:
@@ -58,22 +58,34 @@ _TF_LABEL = {"1min": "M1", "5min": "M5", "15min": "M15", "30min": "M30",
              "45min": "M45", "1h": "H1", "2h": "H2", "4h": "H4", "1day": "D1"}
 
 
+def _get_safe(endpoint, api_key, **params):
+    """Seperti _get tapi kembalikan {} kalau kena rate limit (429),
+    biar tabel multi-TF tetap tampil parsial alih-alih crash."""
+    try:
+        return _get(endpoint, api_key, **params)
+    except RuntimeError as e:
+        if "429" in str(e):
+            return {}
+        raise
+
+
 def _stoch(api_key, interval):
-    d = _get("stoch", api_key, interval=interval, outputsize=1)
+    d = _get_safe("stoch", api_key, interval=interval, outputsize=1)
     # Twelve Data stoch: field slow_k / slow_d
     return _last_value(d, "slow_k"), _last_value(d, "slow_d")
 
 
 def fetch_multi_tf(api_key, timeframes=None) -> dict:
     """Ambil RSI + Stochastic + MACD untuk beberapa timeframe.
-    Biaya: 1 (quote) + 3 per timeframe credit Twelve Data."""
+    Biaya: 1 (quote) + 3 per timeframe credit Twelve Data.
+    Tahan rate limit free tier: indikator yg kena 429 jadi None ('-')."""
     timeframes = timeframes or MTF_TIMEFRAMES
     quote = _get("quote", api_key)
     rows = []
     for tf in timeframes:
-        rsi = _last_value(_get("rsi", api_key, interval=tf, outputsize=1), "rsi")
+        rsi = _last_value(_get_safe("rsi", api_key, interval=tf, outputsize=1), "rsi")
         k, dd = _stoch(api_key, tf)
-        md = _get("macd", api_key, interval=tf, outputsize=1)
+        md = _get_safe("macd", api_key, interval=tf, outputsize=1)
         rows.append({
             "tf": tf,
             "rsi": rsi,
@@ -142,7 +154,13 @@ def build_mtf(data: dict) -> str:
         concl = "🔴 Mayoritas timeframe BEARISH"
     else:
         concl = "⚪ Timeframe MIXED — tunggu konfirmasi"
-    lines += ["", concl, "⚠️ analisa teknikal, bukan saran finansial"]
+    lines += ["", concl]
+    # Catatan kalau ada data hilang akibat rate limit free tier
+    missing = any(r["rsi"] is None or r["k"] is None or r["macd"] is None
+                  for r in rows)
+    if missing:
+        lines.append("ℹ️ sebagian data '-' (limit free tier 8/mnt) — coba lagi / upgrade")
+    lines.append("⚠️ analisa teknikal, bukan saran finansial")
     return "\n".join(lines)
 
 
