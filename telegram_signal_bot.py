@@ -27,6 +27,7 @@ from urllib.request import urlopen, Request
 
 from xauusd_analyzer import fetch_market, get_api_key
 from xauusd_signal import build_signal, fetch_signal_data
+from xauusd_ai import ask
 
 API_BASE = "https://api.telegram.org"
 
@@ -57,7 +58,9 @@ HELP = (
     "Perintah:\n"
     "/signal — analisa teknikal XAU/USD terbaru\n"
     "/price — harga XAU/USD saat ini\n"
-    "Data: Twelve Data. ⚠️ Bukan saran finansial."
+    "Atau ketik pertanyaan bebas (mis. _gold sekarang gimana, layak buy?_) "
+    "dan AI akan menjawab pakai data live.\n"
+    "Data: Twelve Data + Claude AI. ⚠️ Bukan saran finansial."
 )
 
 
@@ -100,11 +103,20 @@ def main():
                     continue
                 text = msg.get("text", "")
                 chat_id = msg["chat"]["id"]
+                if not text:
+                    continue
                 if text.startswith("/"):
                     try:
                         handle_command(token, api_key, chat_id, text)
                     except Exception as e:
                         send(token, chat_id, f"⚠️ Error ambil data: {e}")
+                else:
+                    # teks bebas -> dijawab AI (Claude) pakai data live
+                    try:
+                        tg_api(token, "sendChatAction", chat_id=chat_id, action="typing")
+                        send(token, chat_id, ask(text, api_key), markdown=False)
+                    except Exception as e:
+                        send(token, chat_id, f"⚠️ Error AI: {e}")
         except Exception as e:
             print("WARN:", e)
             time.sleep(5)

@@ -9,8 +9,19 @@ dengan opsi kirim ke bot Telegram tiap 5 menit.
 | `xauusd_realtime.py` | Baca harga XAU/USD realtime (single-shot / `--watch`) |
 | `xauusd_analyzer.py` | Ambil quote + RSI/MACD/EMA, hasilkan analisa bias market |
 | `xauusd_signal.py` | **Scalp signal** actionable: arah, grade, entry/SL/TP, konfluens, failed-breakout |
-| `telegram_signal_bot.py` | Bot on-demand: balas `/signal`, `/price` dengan scalp signal live |
+| `xauusd_ai.py` | **AI (Claude)**: jawab pertanyaan teks bebas pakai data XAU/USD live |
+| `telegram_signal_bot.py` | Bot on-demand: `/signal`, `/price`, **+ tanya bebas dijawab AI** |
 | `telegram_xauusd_bot.py` | Kirim scalp signal ke Telegram (single / `--loop` tiap 5 menit) |
+
+## AI (tanya bebas)
+Bot bisa menjawab pertanyaan bahasa natural (mis. _"gold sekarang gimana, layak buy?"_)
+memakai **Claude (`claude-opus-4-8`)** + data XAU/USD live. Perlu API key Anthropic:
+```bash
+export ANTHROPIC_API_KEY="sk-ant-..."
+pip install -r requirements.txt
+python telegram_signal_bot.py     # /signal, /price, dan tanya bebas (AI)
+python xauusd_ai.py "gold layak buy gak sekarang?"   # tes CLI
+```
 
 ## Setup
 ```bash
