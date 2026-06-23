@@ -26,7 +26,7 @@ from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
 from xauusd_analyzer import fetch_market, get_api_key
-from xauusd_signal import build_signal, fetch_signal_data
+from xauusd_signal import build_signal, fetch_signal_data, build_mtf, fetch_multi_tf
 from xauusd_ai import ask
 
 API_BASE = "https://api.telegram.org"
@@ -56,7 +56,8 @@ def send(token: str, chat_id, text: str, markdown: bool = True):
 HELP = (
     "*XAUUSD Signal Bot* 🪙\n"
     "Perintah:\n"
-    "/signal — analisa teknikal XAU/USD terbaru\n"
+    "/signal — sinyal scalp XAU/USD (entry/SL/TP)\n"
+    "/mtf — momentum multi-timeframe (RSI+Stoch+MACD)\n"
     "/price — harga XAU/USD saat ini\n"
     "Atau ketik pertanyaan bebas (mis. _gold sekarang gimana, layak buy?_) "
     "dan AI akan menjawab pakai data live.\n"
@@ -71,6 +72,9 @@ def handle_command(token: str, api_key: str, chat_id, text: str):
     elif cmd == "/signal":
         send(token, chat_id, "⏳ Mengambil data XAU/USD...")
         send(token, chat_id, build_signal(fetch_signal_data(api_key)), markdown=False)
+    elif cmd == "/mtf":
+        send(token, chat_id, "⏳ Menghitung multi-timeframe...")
+        send(token, chat_id, build_mtf(fetch_multi_tf(api_key)), markdown=False)
     elif cmd == "/price":
         m = fetch_market(api_key)
         q = m["quote"]

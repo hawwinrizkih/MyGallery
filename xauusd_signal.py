@@ -11,6 +11,7 @@ failed-breakout, RSI, ADX). SL/TP dihitung dari ATR + struktur swing.
 ⚠️ Analisa teknikal otomatis, BUKAN saran finansial.
 """
 
+import os
 import sys
 
 from xauusd_analyzer import _get, _last_value, get_api_key
@@ -19,6 +20,12 @@ LOOKBACK = 12          # jumlah bar 15m untuk struktur swing
 ATR_SL = 0.6           # buffer SL di atas/bawah swing (x ATR)
 ATR_TP1 = 1.5          # jarak TP1 (x ATR)
 ATR_TP2 = 3.0          # jarak TP2 (x ATR)
+
+# Timeframe untuk tabel multi-timeframe (/mtf).
+# Default M5+M15 = 7 credit Twelve Data (aman utk free tier 8/menit).
+# Tambah "1min" -> M1/M5/M15 = 10 credit (bisa kena rate limit free tier).
+MTF_TIMEFRAMES = [t.strip() for t in
+                  os.environ.get("MTF_TIMEFRAMES", "5min,15min").split(",") if t.strip()]
 
 
 def fetch_signal_data(api_key: str) -> dict:
@@ -41,6 +48,102 @@ def _f(x):
         return float(x)
     except (TypeError, ValueError):
         return None
+
+
+# ---------------------------------------------------------------------------
+# Multi-timeframe momentum (/mtf) — RSI + Stochastic + MACD per timeframe
+# ---------------------------------------------------------------------------
+
+_TF_LABEL = {"1min": "M1", "5min": "M5", "15min": "M15", "30min": "M30",
+             "45min": "M45", "1h": "H1", "2h": "H2", "4h": "H4", "1day": "D1"}
+
+
+def _stoch(api_key, interval):
+    d = _get("stoch", api_key, interval=interval, outputsize=1)
+    # Twelve Data stoch: field slow_k / slow_d
+    return _last_value(d, "slow_k"), _last_value(d, "slow_d")
+
+
+def fetch_multi_tf(api_key, timeframes=None) -> dict:
+    """Ambil RSI + Stochastic + MACD untuk beberapa timeframe.
+    Biaya: 1 (quote) + 3 per timeframe credit Twelve Data."""
+    timeframes = timeframes or MTF_TIMEFRAMES
+    quote = _get("quote", api_key)
+    rows = []
+    for tf in timeframes:
+        rsi = _last_value(_get("rsi", api_key, interval=tf, outputsize=1), "rsi")
+        k, dd = _stoch(api_key, tf)
+        md = _get("macd", api_key, interval=tf, outputsize=1)
+        rows.append({
+            "tf": tf,
+            "rsi": rsi,
+            "k": k, "d": dd,
+            "macd": _last_value(md, "macd"),
+            "signal": _last_value(md, "macd_signal"),
+        })
+    return {"quote": quote, "rows": rows}
+
+
+def _tf_bias(rsi, k, d, macd, signal):
+    """Skor momentum 1 timeframe -> (emoji, label)."""
+    score = 0
+    if rsi is not None:
+        score += 1 if rsi >= 50 else -1
+    if k is not None and d is not None:
+        score += 1 if k >= d else -1
+    if macd is not None and signal is not None:
+        score += 1 if macd >= signal else -1
+    if score >= 2:
+        return "🟢", "BULLISH"
+    if score <= -2:
+        return "🔴", "BEARISH"
+    return "⚪", "NETRAL"
+
+
+def build_mtf(data: dict) -> str:
+    q = data["quote"]
+    price = _f(q.get("close"))
+    pct = _f(q.get("percent_change"))
+    rows = data.get("rows", [])
+    if price is None or not rows:
+        return "⚠️ Data multi-timeframe tidak lengkap, coba lagi."
+
+    head = f"[MTF] 🪙 GOLD ${price:.2f}"
+    if pct is not None:
+        head += f" ({pct:+.2f}%)"
+    lines = [head, ""]
+
+    biases = []
+    for r in rows:
+        label = _TF_LABEL.get(r["tf"], r["tf"])
+        emoji, bias = _tf_bias(r["rsi"], r["k"], r["d"], r["macd"], r["signal"])
+        biases.append(bias)
+        rsi = f"{r['rsi']:.0f}" if r["rsi"] is not None else "-"
+        k = f"{r['k']:.0f}" if r["k"] is not None else "-"
+        dd = f"{r['d']:.0f}" if r["d"] is not None else "-"
+        if r["macd"] is not None and r["signal"] is not None:
+            mac = "↑" if r["macd"] >= r["signal"] else "↓"
+        else:
+            mac = "-"
+        ovb = ""
+        if r["k"] is not None:
+            if r["k"] >= 80:
+                ovb = " (OB)"
+            elif r["k"] <= 20:
+                ovb = " (OS)"
+        lines.append(f"{emoji} {label}: {bias} · RSI {rsi} · Stoch {k}/{dd}{ovb} · MACD {mac}")
+
+    # Kesimpulan gabungan
+    bulls = biases.count("BULLISH")
+    bears = biases.count("BEARISH")
+    if bulls > bears:
+        concl = "🟢 Mayoritas timeframe BULLISH"
+    elif bears > bulls:
+        concl = "🔴 Mayoritas timeframe BEARISH"
+    else:
+        concl = "⚪ Timeframe MIXED — tunggu konfirmasi"
+    lines += ["", concl, "⚠️ analisa teknikal, bukan saran finansial"]
+    return "\n".join(lines)
 
 
 def build_signal(d: dict) -> str:
@@ -187,6 +290,10 @@ def build_signal(d: dict) -> str:
 
 if __name__ == "__main__":
     try:
-        print(build_signal(fetch_signal_data(get_api_key())))
+        key = get_api_key()
+        if len(sys.argv) > 1 and sys.argv[1] == "mtf":
+            print(build_mtf(fetch_multi_tf(key)))
+        else:
+            print(build_signal(fetch_signal_data(key)))
     except Exception as e:
         sys.exit(f"ERROR: {e}")
