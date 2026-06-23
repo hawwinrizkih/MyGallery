@@ -32,14 +32,13 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
-from xauusd_analyzer import analyze, fetch_market, get_api_key
+from xauusd_analyzer import get_api_key
+from xauusd_signal import build_signal, fetch_signal_data
 
 
 def send_telegram(token: str, chat_id: str, text: str) -> None:
     url = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = urlencode(
-        {"chat_id": chat_id, "text": text, "parse_mode": "Markdown"}
-    ).encode()
+    payload = urlencode({"chat_id": chat_id, "text": text}).encode()
     req = Request(url, data=payload)
     try:
         with urlopen(req, timeout=20) as resp:
@@ -59,7 +58,7 @@ def require_env(name: str) -> str:
 
 
 def run_once(api_key: str, token: str, chat_id: str) -> None:
-    message = analyze(fetch_market(api_key))
+    message = build_signal(fetch_signal_data(api_key))
     send_telegram(token, chat_id, message)
     print(time.strftime("[%Y-%m-%d %H:%M:%S]"), "Terkirim ke Telegram.")
 

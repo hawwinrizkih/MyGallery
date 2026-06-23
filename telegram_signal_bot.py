@@ -25,7 +25,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import urlopen, Request
 
-from xauusd_analyzer import analyze, fetch_market, get_api_key, fmt
+from xauusd_analyzer import fetch_market, get_api_key
+from xauusd_signal import build_signal, fetch_signal_data
 
 API_BASE = "https://api.telegram.org"
 
@@ -44,8 +45,11 @@ def tg_api(token: str, method: str, **params):
         raise RuntimeError(f"Telegram network error ({method}): {e.reason}")
 
 
-def send(token: str, chat_id, text: str):
-    tg_api(token, "sendMessage", chat_id=chat_id, text=text, parse_mode="Markdown")
+def send(token: str, chat_id, text: str, markdown: bool = True):
+    params = dict(chat_id=chat_id, text=text)
+    if markdown:
+        params["parse_mode"] = "Markdown"
+    tg_api(token, "sendMessage", **params)
 
 
 HELP = (
@@ -63,7 +67,7 @@ def handle_command(token: str, api_key: str, chat_id, text: str):
         send(token, chat_id, HELP)
     elif cmd == "/signal":
         send(token, chat_id, "⏳ Mengambil data XAU/USD...")
-        send(token, chat_id, analyze(fetch_market(api_key)))
+        send(token, chat_id, build_signal(fetch_signal_data(api_key)), markdown=False)
     elif cmd == "/price":
         m = fetch_market(api_key)
         q = m["quote"]

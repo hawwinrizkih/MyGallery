@@ -8,7 +8,9 @@ dengan opsi kirim ke bot Telegram tiap 5 menit.
 |------|--------|
 | `xauusd_realtime.py` | Baca harga XAU/USD realtime (single-shot / `--watch`) |
 | `xauusd_analyzer.py` | Ambil quote + RSI/MACD/EMA, hasilkan analisa bias market |
-| `telegram_xauusd_bot.py` | Kirim analisa ke Telegram (single / `--loop` tiap 5 menit) |
+| `xauusd_signal.py` | **Scalp signal** actionable: arah, grade, entry/SL/TP, konfluens, failed-breakout |
+| `telegram_signal_bot.py` | Bot on-demand: balas `/signal`, `/price` dengan scalp signal live |
+| `telegram_xauusd_bot.py` | Kirim scalp signal ke Telegram (single / `--loop` tiap 5 menit) |
 
 ## Setup
 ```bash
