@@ -64,20 +64,42 @@ def ask(question: str, td_key: str | None = None) -> str:
                 "Jalankan: pip install anthropic)")
 
     td_key = td_key or get_api_key()
-    context = build_context(td_key)
 
+    # 1) Ambil data pasar (Twelve Data) — tangani rate limit free tier
+    try:
+        context = build_context(td_key)
+    except RuntimeError as e:
+        if "429" in str(e):
+            return ("⚠️ Data pasar lagi kena rate limit Twelve Data "
+                    "(free tier 8/menit). Coba lagi sebentar ya.")
+        return f"⚠️ Gagal ambil data pasar: {e}"
+
+    # 2) Tanya ke Claude — tangani error billing/rate limit dengan pesan ramah
     client = anthropic.Anthropic()  # baca ANTHROPIC_API_KEY dari environment
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=1024,
-        system=SYSTEM_PROMPT,
-        messages=[
-            {
-                "role": "user",
-                "content": f"{context}\n\n=== PERTANYAAN USER ===\n{question}",
-            }
-        ],
-    )
+    try:
+        response = client.messages.create(
+            model=MODEL,
+            max_tokens=1024,
+            system=SYSTEM_PROMPT,
+            messages=[
+                {
+                    "role": "user",
+                    "content": f"{context}\n\n=== PERTANYAAN USER ===\n{question}",
+                }
+            ],
+        )
+    except anthropic.AuthenticationError:
+        return "⚠️ ANTHROPIC_API_KEY tidak valid. Cek lagi key-nya."
+    except anthropic.BadRequestError as e:
+        if "credit balance" in str(e).lower():
+            return ("⚠️ Saldo kredit Anthropic habis. Isi dulu di "
+                    "console.anthropic.com → Plans & Billing.")
+        return f"⚠️ Permintaan AI ditolak: {e}"
+    except anthropic.RateLimitError:
+        return "⚠️ AI lagi kena rate limit. Coba lagi sebentar."
+    except anthropic.APIError as e:
+        return f"⚠️ Error AI: {e}"
+
     return "".join(b.text for b in response.content if b.type == "text").strip()
 
 
