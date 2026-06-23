@@ -20,6 +20,7 @@ Gemini tidak butuh dependency tambahan (pakai REST). Claude butuh: pip install a
 import json
 import os
 import sys
+import time
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
@@ -32,7 +33,7 @@ from xauusd_analyzer import get_api_key
 from xauusd_signal import build_signal, fetch_signal_data
 
 CLAUDE_MODEL = "claude-opus-4-8"
-GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-2.0-flash")
+GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")
 
 SYSTEM_PROMPT = (
     "Kamu adalah asisten analis pasar XAU/USD (emas) yang ramah dan ringkas. "
@@ -84,26 +85,51 @@ def _ask_gemini(prompt: str) -> str:
         return "⚠️ GEMINI_API_KEY belum di-set."
     url = (
         f"https://generativelanguage.googleapis.com/v1beta/models/"
-        f"{GEMINI_MODEL}:generateContent?key={key}"
+        f"{GEMINI_MODEL}:generateContent"
     )
     body = json.dumps({
         "system_instruction": {"parts": [{"text": SYSTEM_PROMPT}]},
         "contents": [{"role": "user", "parts": [{"text": prompt}]}],
-        "generationConfig": {"maxOutputTokens": 1024, "temperature": 0.4},
+        "generationConfig": {
+            "maxOutputTokens": 1024,
+            "temperature": 0.4,
+            # Matikan "thinking" agar respons non-streaming cepat (hindari timeout).
+            "thinkingConfig": {"thinkingBudget": 0},
+        },
     }).encode()
-    req = Request(url, data=body, headers={"Content-Type": "application/json"})
-    try:
-        with urlopen(req, timeout=30) as resp:
-            data = json.loads(resp.read().decode("utf-8"))
-    except HTTPError as e:
-        detail = e.read().decode("utf-8", "ignore")
-        if e.code in (401, 403):
-            return "⚠️ GEMINI_API_KEY tidak valid / ditolak. Cek lagi key-nya."
-        if e.code == 429:
-            return "⚠️ Gemini kena rate limit (free tier). Coba lagi sebentar."
-        return f"⚠️ Gemini HTTP {e.code}: {detail[:200]}"
-    except URLError as e:
-        return f"⚠️ Gemini network error: {e.reason}"
+    req = Request(url, data=body, headers={
+        "Content-Type": "application/json",
+        "X-goog-api-key": key,
+    })
+
+    # Auto-retry untuk overload sementara (503) / rate limit (429).
+    data = None
+    for attempt in range(3):
+        try:
+            with urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+            break
+        except HTTPError as e:
+            detail = e.read().decode("utf-8", "ignore")
+            if e.code in (401, 403):
+                return "⚠️ GEMINI_API_KEY tidak valid / ditolak. Cek lagi key-nya."
+            if e.code in (429, 500, 503) and attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            if e.code == 429:
+                return "⚠️ Gemini kena rate limit (free tier). Coba lagi sebentar."
+            if e.code == 503:
+                return "⚠️ Model Gemini lagi sibuk (high demand). Coba lagi sebentar."
+            return f"⚠️ Gemini HTTP {e.code}: {detail[:200]}"
+        except (URLError, TimeoutError) as e:
+            if attempt < 2:
+                time.sleep(2 * (attempt + 1))
+                continue
+            reason = getattr(e, "reason", e)
+            return f"⚠️ Gemini lambat/timeout: {reason}. Coba lagi sebentar."
+
+    if data is None:
+        return "⚠️ Gemini tidak merespons. Coba lagi sebentar."
 
     candidates = data.get("candidates", [])
     if not candidates:
