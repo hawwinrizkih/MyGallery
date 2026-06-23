@@ -1,0 +1,32 @@
+name: XAUUSD Signal
+
+# Kirim scalp signal XAU/USD ke Telegram tiap 15 menit (menit 01,16,31,46).
+# Catatan: jadwal cron GitHub Actions bisa telat beberapa menit saat sibuk.
+on:
+  schedule:
+    - cron: "1,16,31,46 * * * *"
+  workflow_dispatch: {}   # bisa dijalankan manual dari tab Actions
+
+concurrency:
+  group: xauusd-signal
+  cancel-in-progress: false
+
+jobs:
+  send-signal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Kirim sinyal ke Telegram
+        env:
+          TWELVEDATA_API_KEY: ${{ secrets.TWELVEDATA_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: python telegram_xauusd_bot.py
