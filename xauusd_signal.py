@@ -29,18 +29,21 @@ MTF_TIMEFRAMES = [t.strip() for t in
 
 
 def fetch_signal_data(api_key: str) -> dict:
-    """~6 credit Twelve Data."""
+    """~7 credit Twelve Data."""
     quote = _get("quote", api_key)
     ts = _get("time_series", api_key, interval="15min", outputsize=LOOKBACK + 1)
     rsi = _last_value(_get("rsi", api_key, interval="15min", outputsize=1), "rsi")
     adx = _last_value(_get("adx", api_key, interval="15min", outputsize=1), "adx")
     atr = _last_value(_get("atr", api_key, interval="15min", outputsize=1), "atr")
+    st = _get("stoch", api_key, interval="15min", outputsize=1)
+    stoch_k = _last_value(st, "slow_k")
+    stoch_d = _last_value(st, "slow_d")
     ema_d = _last_value(
         _get("ema", api_key, interval="1day", time_period=20, outputsize=1), "ema"
     )
     bars = ts.get("values", [])
     return {"quote": quote, "bars": bars, "rsi": rsi, "adx": adx,
-            "atr": atr, "ema20_daily": ema_d}
+            "atr": atr, "stoch_k": stoch_k, "stoch_d": stoch_d, "ema20_daily": ema_d}
 
 
 def _f(x):
@@ -171,6 +174,8 @@ def build_signal(d: dict) -> str:
     atr = d["atr"] or 1.0
     rsi = d["rsi"]
     adx = d["adx"]
+    stoch_k = d.get("stoch_k")
+    stoch_d = d.get("stoch_d")
     ema_d = d["ema20_daily"]
 
     if not bars or price is None:
@@ -226,6 +231,21 @@ def build_signal(d: dict) -> str:
         elif daily == "BULLISH":
             buy_score += 1
             buy_conf.append(f"ADX {adx:.0f} (tren kuat)")
+
+    # --- Stochastic: cross + overbought/oversold ---
+    if stoch_k is not None and stoch_d is not None:
+        if stoch_k < stoch_d:
+            sell_score += 1
+            sell_conf.append(f"Stoch bearish cross (K{stoch_k:.0f}<D{stoch_d:.0f})")
+        elif stoch_k > stoch_d:
+            buy_score += 1
+            buy_conf.append(f"Stoch bullish cross (K{stoch_k:.0f}>D{stoch_d:.0f})")
+        if stoch_k >= 80:
+            sell_score += 1
+            sell_conf.append(f"Stoch overbought ({stoch_k:.0f})")
+        elif stoch_k <= 20:
+            buy_score += 1
+            buy_conf.append(f"Stoch oversold ({stoch_k:.0f})")
 
     if failed_up:
         sell_score += 2
@@ -297,8 +317,10 @@ def build_signal(d: dict) -> str:
         f"[SCALP] {emoji} GOLD — {direction} · Grade {grade}{setup}",
         f"Entry area: {entry_lo}–{entry_hi} (harga skrg {price:.0f})",
         f"SL {sl} · TP1 {tp1} · TP2 {tp2}",
-        f"📊 RSI ~{rsi:.0f} {rsi_dir} · ADX ~{adx:.0f}" if rsi is not None and adx is not None
-            else "📊 indikator parsial",
+        f"📊 RSI ~{rsi:.0f} {rsi_dir} · Stoch {stoch_k:.0f}/{stoch_d:.0f} · ADX ~{adx:.0f}"
+            if rsi is not None and adx is not None and stoch_k is not None and stoch_d is not None
+            else (f"📊 RSI ~{rsi:.0f} {rsi_dir} · ADX ~{adx:.0f}"
+                  if rsi is not None and adx is not None else "📊 indikator parsial"),
         f"Bias: {align_txt} | Konfluens: " + " + ".join(conf),
         warn,
         "⚠️ analisa teknikal, bukan saran finansial",

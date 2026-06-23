@@ -58,6 +58,7 @@ def build_context(api_key: str) -> str:
         f"High hari ini: {q.get('high')} | Low: {q.get('low')}",
         f"Open: {q.get('open')} | Previous close: {q.get('previous_close')}",
         f"RSI 15m: {data.get('rsi')}",
+        f"Stochastic 15m: K={data.get('stoch_k')} D={data.get('stoch_d')}",
         f"ADX 15m: {data.get('adx')}",
         f"ATR 15m: {data.get('atr')}",
         f"EMA20 daily: {data.get('ema20_daily')}",
