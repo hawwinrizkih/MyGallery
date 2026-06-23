@@ -60,7 +60,7 @@ HELP = (
     "/price — harga XAU/USD saat ini\n"
     "Atau ketik pertanyaan bebas (mis. _gold sekarang gimana, layak buy?_) "
     "dan AI akan menjawab pakai data live.\n"
-    "Data: Twelve Data + Claude AI. ⚠️ Bukan saran finansial."
+    "Data: Twelve Data + AI (Gemini/Claude). ⚠️ Bukan saran finansial."
 )
 
 

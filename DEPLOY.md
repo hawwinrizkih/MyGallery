@@ -8,7 +8,13 @@ butuh proses yang **nyala terus** (long-polling). Berikut cara deploy-nya.
 |------|-------|-------|
 | `TWELVEDATA_API_KEY` | ✅ | data pasar + sinyal |
 | `TELEGRAM_BOT_TOKEN` | ✅ | bot Telegram |
-| `ANTHROPIC_API_KEY` | opsional | fitur tanya-bebas AI (perlu kredit) |
+| `GEMINI_API_KEY` | opsional | fitur tanya-bebas AI — **GRATIS** (aistudio.google.com) |
+| `ANTHROPIC_API_KEY` | opsional | alternatif AI (Claude, berbayar per token) |
+
+> Untuk tanya-bebas AI, cukup salah satu: **`GEMINI_API_KEY`** (gratis, disarankan)
+> atau `ANTHROPIC_API_KEY`. Kalau dua-duanya diisi, Gemini dipakai duluan
+> (atur paksa via `AI_PROVIDER=gemini|claude`). Model Gemini bisa diganti via
+> `GEMINI_MODEL` (default `gemini-2.0-flash`).
 
 > `TELEGRAM_CHAT_ID` TIDAK diperlukan untuk bot ini (dia balas ke siapa pun
 > yang chat). Itu hanya untuk mode auto-push (`telegram_xauusd_bot.py`).
